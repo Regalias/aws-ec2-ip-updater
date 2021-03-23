@@ -1,0 +1,59 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  ec2-ip-updater
+
+  SAM Template for ec2-ip-updater
+
+Globals:
+  Function:
+    Timeout: 3
+
+Parameters:
+  HostedZoneId:
+    Type: String
+
+  ResourceRecordFQDN:
+    Type: String
+
+  TargetInstanceId:
+    Type: String
+
+Resources:
+  UpdaterFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ip_updater_function
+      Handler: ip_updater/app.handler
+      Runtime: python3.8
+      Environment:
+        Variables:
+          HOSTED_ZONE_ID: !Ref HostedZoneId
+          RECORD_NAME: !Ref ResourceRecordFQDN
+      Policies:
+        - EC2DescribePolicy: {}
+        - Route53ChangeResourceRecordSetsPolicy:
+            HostedZoneId:
+              !Ref HostedZoneId
+      Events:
+        InstanceStartEvent:
+          Type: CloudWatchEvent
+          Properties:
+            Pattern:
+              source:
+                - aws.ec2
+              detail-type:
+                - EC2 Instance State-change Notification
+              detail:
+                state:
+                  - running
+                instance-id:
+                  - !Ref TargetInstanceId
+
+Outputs:
+  UpdaterFunction:
+    Description: "Lambda Function ARN"
+    Value: !GetAtt UpdaterFunction.Arn
+  UpdaterFunctionRole:
+    Description: "Implicit IAM Role created for function"
+    Value: !GetAtt UpdaterFunction.Arn
